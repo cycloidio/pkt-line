@@ -1,3 +1,4 @@
+// Modified by Giacomo Tartari
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,58 +13,60 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gitprotocolio
+package pkt
 
 import (
 	"fmt"
 	"io"
+
+	"github.com/cycloidio/pkt-line"
 )
 
-type protocolV2ResponseState int
+type ResponseState int
 
 const (
-	protocolV2ResponseStateBegin protocolV2ResponseState = iota
-	protocolV2ResponseStateScanResponse
-	protocolV2ResponseStateEnd
+	ResponseBegin ResponseState = iota
+	ResponseScanResponse
+	ResponseEnd
 )
 
-// ProtocolV2ResponseChunk is a chunk of a protocol v2 response.
-type ProtocolV2ResponseChunk struct {
+// ResponseChunk is a chunk of a protocol v2 response.
+type ResponseChunk struct {
 	Response    []byte
 	Delimiter   bool
 	EndResponse bool
 }
 
 // EncodeToPktLine serializes the chunk.
-func (c *ProtocolV2ResponseChunk) EncodeToPktLine() []byte {
+func (c *ResponseChunk) EncodeToPktLine() []byte {
 	if len(c.Response) != 0 {
-		return BytesPacket(c.Response).EncodeToPktLine()
+		return pkt.BytesPacket(c.Response).EncodeToPktLine()
 	}
 	if c.Delimiter {
-		return DelimPacket{}.EncodeToPktLine()
+		return pkt.DelimPacket{}.EncodeToPktLine()
 	}
 	if c.EndResponse {
-		return FlushPacket{}.EncodeToPktLine()
+		return pkt.FlushPacket{}.EncodeToPktLine()
 	}
 	panic("impossible chunk")
 }
 
-// ProtocolV2Response provides an interface for reading a protocol v2 response.
-type ProtocolV2Response struct {
-	scanner *PacketScanner
-	state   protocolV2ResponseState
+// Response provides an interface for reading a protocol v2 response.
+type Response struct {
+	scanner *pkt.PacketScanner
+	state   ResponseState
 	err     error
-	curr    *ProtocolV2ResponseChunk
+	curr    *ResponseChunk
 }
 
-// NewProtocolV2Response returns a new ProtocolV2Response to read from rd.
-func NewProtocolV2Response(rd io.Reader) *ProtocolV2Response {
-	return &ProtocolV2Response{scanner: NewPacketScanner(rd)}
+// NewResponse returns a new ProtocolV2Response to read from rd.
+func NewResponse(rd io.Reader) *Response {
+	return &Response{scanner: pkt.NewPacketScanner(rd)}
 }
 
 // Err returns the first non-EOF error that was encountered by the
 // ProtocolV2Response.
-func (r *ProtocolV2Response) Err() error {
+func (r *Response) Err() error {
 	return r.err
 }
 
@@ -71,7 +74,7 @@ func (r *ProtocolV2Response) Err() error {
 //
 // The underlying array of Response may point to data that will be overwritten
 // by a subsequent call to Scan. It does no allocation.
-func (r *ProtocolV2Response) Chunk() *ProtocolV2ResponseChunk {
+func (r *Response) Chunk() *ResponseChunk {
 	return r.curr
 }
 
@@ -79,39 +82,39 @@ func (r *ProtocolV2Response) Chunk() *ProtocolV2ResponseChunk {
 // stops, either by reaching the end of the input or an error. After scan
 // returns false, the Err method will return any error that occurred during
 // scanning, except that if it was io.EOF, Err will return nil.
-func (r *ProtocolV2Response) Scan() bool {
-	if r.err != nil || r.state == protocolV2ResponseStateEnd {
+func (r *Response) Scan() bool {
+	if r.err != nil || r.state == ResponseEnd {
 		return false
 	}
 	if !r.scanner.Scan() {
 		r.err = r.scanner.Err()
-		if r.err == nil && r.state != protocolV2ResponseStateBegin {
-			r.err = SyntaxError("early EOF")
+		if r.err == nil && r.state != ResponseBegin {
+			r.err = pkt.SyntaxError("early EOF")
 		}
 		return false
 	}
 
 	switch p := r.scanner.Packet().(type) {
-	case FlushPacket:
-		r.state = protocolV2ResponseStateBegin
-		r.curr = &ProtocolV2ResponseChunk{
+	case pkt.FlushPacket:
+		r.state = ResponseBegin
+		r.curr = &ResponseChunk{
 			EndResponse: true,
 		}
 		return true
-	case DelimPacket:
-		r.state = protocolV2ResponseStateScanResponse
-		r.curr = &ProtocolV2ResponseChunk{
+	case pkt.DelimPacket:
+		r.state = ResponseScanResponse
+		r.curr = &ResponseChunk{
 			Delimiter: true,
 		}
 		return true
-	case BytesPacket:
-		r.state = protocolV2ResponseStateScanResponse
-		r.curr = &ProtocolV2ResponseChunk{
+	case pkt.BytesPacket:
+		r.state = ResponseScanResponse
+		r.curr = &ResponseChunk{
 			Response: p,
 		}
 		return true
 	default:
-		r.err = SyntaxError(fmt.Sprintf("unexpected packet: %#v", r.scanner.Packet()))
+		r.err = pkt.SyntaxError(fmt.Sprintf("unexpected packet: %#v", r.scanner.Packet()))
 		return false
 	}
 }

@@ -26,11 +26,11 @@ func TestFetch(t *testing.T) {
 	if _, err := r.run("commit", "--allow-empty", "--message=init"); err != nil {
 		t.Fatal(err)
 	}
-	want, err := r.run("rev-parse", "master")
+	want, err := r.run("rev-parse", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.run("push", httpServerURL, "master:master"); err != nil {
+	if _, err := r.run("push", httpServerURL, "main:main"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -63,7 +63,7 @@ func TestFetch_multiWants(t *testing.T) {
 	if _, err := r.run("commit", "--allow-empty", "--message=another"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.run("push", httpServerURL, "master:master", "testbranch:testbranch"); err != nil {
+	if _, err := r.run("push", httpServerURL, "main:main", "testbranch:testbranch"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -89,11 +89,11 @@ func TestFetch_shallowDepth(t *testing.T) {
 	if _, err := r.run("commit", "--allow-empty", "--message=init"); err != nil {
 		t.Fatal(err)
 	}
-	want, err := r.run("rev-parse", "master")
+	want, err := r.run("rev-parse", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.run("push", httpServerURL, "master:master"); err != nil {
+	if _, err := r.run("push", httpServerURL, "main:main"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -120,7 +120,7 @@ func TestFetch_deepen(t *testing.T) {
 	if _, err := r.run("commit", "--allow-empty", "--message=init"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.run("push", httpServerURL, "master:master"); err != nil {
+	if _, err := r.run("push", httpServerURL, "main:main"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -150,7 +150,7 @@ func TestFetch_shallowSince(t *testing.T) {
 	if _, err := r.run("commit", "--allow-empty", "--message=init"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.run("push", httpServerURL, "master:master"); err != nil {
+	if _, err := r.run("push", httpServerURL, "main:main"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -178,7 +178,7 @@ func TestFetch_shallowNot(t *testing.T) {
 	if _, err := r.run("commit", "--allow-empty", "--message=second"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.run("push", httpServerURL, "--follow-tags"); err != nil {
+	if _, err := r.run("push", "--set-upstream", httpServerURL, "main", "--follow-tags"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -200,7 +200,7 @@ func TestFetch_filter(t *testing.T) {
 	if _, err := r.run("commit", "--allow-empty", "--message=init"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.run("push", httpServerURL, "master:master"); err != nil {
+	if _, err := r.run("push", httpServerURL, "main:main"); err != nil {
 		t.Fatalf("%v", err)
 	}
 

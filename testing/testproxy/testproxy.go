@@ -1,3 +1,4 @@
+// Modified by Giacomo Tartari
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +22,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/google/gitprotocolio/testing"
+	"github.com/cycloidio/pkt-line/testing"
 )
 
 var (

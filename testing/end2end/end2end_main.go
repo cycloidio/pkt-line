@@ -1,3 +1,4 @@
+// Modified by Giacomo Tartari
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +18,6 @@ package end2end
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -25,7 +25,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/google/gitprotocolio/testing"
+	"github.com/cycloidio/pkt-line/testing"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 )
 
 func init() {
-	dir, err := ioutil.TempDir("", "gitprotocolio_remote")
+	dir, err := os.MkdirTemp("", "gitprotocolio_remote")
 	if err != nil {
 		log.Fatal("cannot create remote dir", err)
 	}
@@ -79,7 +79,7 @@ func init() {
 		httpProxyURL = fmt.Sprintf("http://%s/", l.Addr().String())
 	}
 
-	gnuPGHome, err = ioutil.TempDir("", "gitprotocolio_remote")
+	gnuPGHome, err = os.MkdirTemp("", "gitprotocolio_remote")
 	if err != nil {
 		log.Fatal("cannot create a GNUPGHOME: ", err)
 	}
@@ -121,7 +121,7 @@ func refreshRemote() {
 }
 
 func createLocalGitRepo() gitRepo {
-	dir, err := ioutil.TempDir("", "gitprotocolio_local")
+	dir, err := os.MkdirTemp("", "gitprotocolio_local")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,4 +1,6 @@
-# gitprotocolio
+# pktline
+
+This project is a fork of [gitprotocolio](github.com/google/gitprotocolio).
 
 A Git protocol parser written in Go.
 

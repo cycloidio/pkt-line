@@ -1,3 +1,4 @@
+// Modified by Giacomo Tartari
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gitprotocolio
+package pkt
 
 import (
 	"bufio"
@@ -53,6 +54,18 @@ type BytesPacket []byte
 
 // EncodeToPktLine serializes the packet.
 func (b BytesPacket) EncodeToPktLine() []byte {
+	sz := len(b)
+	if sz > 0xFFFF-4 {
+		panic("content too large")
+	}
+	return append([]byte(fmt.Sprintf("%04x", sz+4)), b...)
+}
+
+// BytesPacket is a packet with a content.
+type StringPacket string
+
+// EncodeToPktLine serializes the packet.
+func (b StringPacket) EncodeToPktLine() []byte {
 	sz := len(b)
 	if sz > 0xFFFF-4 {
 		panic("content too large")

@@ -38,11 +38,11 @@ func TestLsRemote_nonEmpty(t *testing.T) {
 	if _, err := r.run("commit", "--allow-empty", "--message=init"); err != nil {
 		t.Fatal(err)
 	}
-	_, err := r.run("rev-parse", "master")
+	_, err := r.run("rev-parse", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.run("push", httpServerURL, "master:master"); err != nil {
+	if _, err := r.run("push", httpServerURL, "main:main"); err != nil {
 		t.Fatalf("%v", err)
 	}
 

@@ -1,3 +1,4 @@
+// Modified by Giacomo Tartari
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +26,8 @@ import (
 	"path"
 	"sync"
 
-	"github.com/google/gitprotocolio"
+	"github.com/cycloidio/pkt-line"
+	protv2 "github.com/cycloidio/pkt-line/v2"
 )
 
 // HTTPProxyHandler returns an http.handler that delegates requests to the
@@ -71,19 +73,19 @@ func (s *httpProxyServer) infoRefsHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Add("Content-Type", fmt.Sprintf("application/x-%s-advertisement", r.URL.Query().Get("service")))
-	infoRefsResp := gitprotocolio.NewInfoRefsResponse(resp.Body)
+	infoRefsResp := pkt.NewInfoRefsResponse(resp.Body)
 	for infoRefsResp.Scan() {
 		if err := writePacket(w, infoRefsResp.Chunk()); err != nil {
-			writePacket(w, gitprotocolio.ErrorPacket("cannot write a packet"))
+			writePacket(w, pkt.ErrorPacket("cannot write a packet"))
 			return
 		}
 	}
 
 	if err := infoRefsResp.Err(); err != nil {
-		if ep, ok := err.(gitprotocolio.ErrorPacket); ok {
+		if ep, ok := err.(pkt.ErrorPacket); ok {
 			writePacket(w, ep)
 		} else {
-			writePacket(w, gitprotocolio.ErrorPacket("internal error"))
+			writePacket(w, pkt.ErrorPacket("internal error"))
 			log.Printf("Parsing error: %#v, parser: %#v", err, infoRefsResp)
 		}
 		return
@@ -116,20 +118,20 @@ func uploadPackV1Handler(delegateURL string, w http.ResponseWriter, r *http.Requ
 	pr, pw := io.Pipe()
 	go func() {
 		defer pw.Close()
-		v1Req := gitprotocolio.NewProtocolV1UploadPackRequest(r.Body)
+		v1Req := pkt.NewUploadRequest(r.Body)
 
 		for v1Req.Scan() {
 			if err := writePacket(pw, v1Req.Chunk()); err != nil {
-				writePacket(pw, gitprotocolio.ErrorPacket("cannot write a packet"))
+				writePacket(pw, pkt.ErrorPacket("cannot write a packet"))
 				return
 			}
 		}
 
 		if err := v1Req.Err(); err != nil {
-			if ep, ok := err.(gitprotocolio.ErrorPacket); ok {
+			if ep, ok := err.(pkt.ErrorPacket); ok {
 				writePacket(pw, ep)
 			} else {
-				writePacket(pw, gitprotocolio.ErrorPacket("internal error"))
+				writePacket(pw, pkt.ErrorPacket("internal error"))
 				log.Printf("Parsing error: %#v, parser: %#v", err, v1Req)
 			}
 			return
@@ -155,19 +157,19 @@ func uploadPackV1Handler(delegateURL string, w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Add("Content-Type", "application/x-git-upload-pack-result")
-	v1Resp := gitprotocolio.NewProtocolV1UploadPackResponse(resp.Body)
+	v1Resp := pkt.NewUploadResponse(resp.Body)
 	for v1Resp.Scan() {
 		if err := writePacket(w, v1Resp.Chunk()); err != nil {
-			writePacket(w, gitprotocolio.ErrorPacket("cannot write a packet"))
+			writePacket(w, pkt.ErrorPacket("cannot write a packet"))
 			return
 		}
 	}
 
 	if err := v1Resp.Err(); err != nil {
-		if ep, ok := err.(gitprotocolio.ErrorPacket); ok {
+		if ep, ok := err.(pkt.ErrorPacket); ok {
 			writePacket(w, ep)
 		} else {
-			writePacket(w, gitprotocolio.ErrorPacket("internal error"))
+			writePacket(w, pkt.ErrorPacket("internal error"))
 			log.Printf("Parsing error: %#v, parser: %#v", err, v1Resp)
 		}
 		return
@@ -200,20 +202,20 @@ func receivePackV1Handler(delegateURL string, w http.ResponseWriter, r *http.Req
 	pr, pw := io.Pipe()
 	go func() {
 		defer pw.Close()
-		v1Req := gitprotocolio.NewProtocolV1ReceivePackRequest(r.Body)
+		v1Req := pkt.NewReceiveRequest(r.Body)
 
 		for v1Req.Scan() {
 			if err := writePacket(pw, v1Req.Chunk()); err != nil {
-				writePacket(pw, gitprotocolio.ErrorPacket("cannot write a packet"))
+				writePacket(pw, pkt.ErrorPacket("cannot write a packet"))
 				return
 			}
 		}
 
 		if err := v1Req.Err(); err != nil {
-			if ep, ok := err.(gitprotocolio.ErrorPacket); ok {
+			if ep, ok := err.(pkt.ErrorPacket); ok {
 				writePacket(pw, ep)
 			} else {
-				writePacket(pw, gitprotocolio.ErrorPacket("internal error"))
+				writePacket(pw, pkt.ErrorPacket("internal error"))
 				log.Printf("Parsing error: %#v, parser: %#v", err, v1Req)
 			}
 			return
@@ -242,20 +244,20 @@ func receivePackV1Handler(delegateURL string, w http.ResponseWriter, r *http.Req
 	mainRd, mainWt := io.Pipe()
 	go func() {
 		defer mainWt.Close()
-		sc := gitprotocolio.NewPacketScanner(resp.Body)
+		sc := pkt.NewPacketScanner(resp.Body)
 	scanner:
 		for sc.Scan() {
 			switch p := sc.Packet().(type) {
-			case gitprotocolio.BytesPacket:
-				sp := gitprotocolio.ParseSideBandPacket(p)
-				if mp, ok := sp.(gitprotocolio.SideBandMainPacket); ok {
+			case pkt.BytesPacket:
+				sp := pkt.ParseSideBandPacket(p)
+				if mp, ok := sp.(pkt.SideBandMainPacket); ok {
 					if _, err := mainWt.Write(mp); err != nil {
 						pktWt.closeWithError(err)
 						return
 					}
 				}
 				pktWt.writePacket(sp)
-			case gitprotocolio.FlushPacket:
+			case pkt.FlushPacket:
 				break scanner
 			default:
 				pktWt.closeWithError(fmt.Errorf("unexpected packet: %#v", sc.Packet()))
@@ -266,10 +268,10 @@ func receivePackV1Handler(delegateURL string, w http.ResponseWriter, r *http.Req
 			pktWt.closeWithError(err)
 		}
 	}()
-	ch, chunkWt := gitprotocolio.NewChunkedWriter(0xFFFF - 5)
+	ch, chunkWt := pkt.NewChunkedWriter(0xFFFF - 5)
 	go func() {
 		defer chunkWt.Close()
-		v1Resp := gitprotocolio.NewProtocolV1ReceivePackResponse(mainRd)
+		v1Resp := pkt.NewReceiveResponse(mainRd)
 		for v1Resp.Scan() {
 			if err := writePacket(chunkWt, v1Resp.Chunk()); err != nil {
 				pktWt.closeWithError(err)
@@ -284,9 +286,9 @@ func receivePackV1Handler(delegateURL string, w http.ResponseWriter, r *http.Req
 
 	w.Header().Add("Content-Type", "application/x-git-receive-pack-result")
 	for bs := range ch {
-		pktWt.writePacket(gitprotocolio.SideBandMainPacket(bs))
+		pktWt.writePacket(pkt.SideBandMainPacket(bs))
 	}
-	pktWt.writePacket(gitprotocolio.FlushPacket{})
+	pktWt.writePacket(pkt.FlushPacket{})
 
 }
 
@@ -294,20 +296,20 @@ func serveProtocolV2(delegateURL string, w http.ResponseWriter, r *http.Request)
 	pr, pw := io.Pipe()
 	go func() {
 		defer pw.Close()
-		v2Req := gitprotocolio.NewProtocolV2Request(r.Body)
+		v2Req := protv2.NewRequest(r.Body)
 
 		for v2Req.Scan() {
 			if err := writePacket(pw, v2Req.Chunk()); err != nil {
-				writePacket(pw, gitprotocolio.ErrorPacket("cannot write a packet"))
+				writePacket(pw, pkt.ErrorPacket("cannot write a packet"))
 				return
 			}
 		}
 
 		if err := v2Req.Err(); err != nil {
-			if ep, ok := err.(gitprotocolio.ErrorPacket); ok {
+			if ep, ok := err.(pkt.ErrorPacket); ok {
 				writePacket(pw, ep)
 			} else {
-				writePacket(pw, gitprotocolio.ErrorPacket("internal error"))
+				writePacket(pw, pkt.ErrorPacket("internal error"))
 				log.Printf("Parsing error: %#v, parser: %#v", err, v2Req)
 			}
 			return
@@ -334,19 +336,19 @@ func serveProtocolV2(delegateURL string, w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Add("Content-Type", "application/x-git-upload-pack-result")
-	v2Resp := gitprotocolio.NewProtocolV2Response(resp.Body)
+	v2Resp := protv2.NewResponse(resp.Body)
 	for v2Resp.Scan() {
 		if err := writePacket(w, v2Resp.Chunk()); err != nil {
-			writePacket(w, gitprotocolio.ErrorPacket("cannot write a packet"))
+			writePacket(w, pkt.ErrorPacket("cannot write a packet"))
 			return
 		}
 	}
 
 	if err := v2Resp.Err(); err != nil {
-		if ep, ok := err.(gitprotocolio.ErrorPacket); ok {
+		if ep, ok := err.(pkt.ErrorPacket); ok {
 			writePacket(w, ep)
 		} else {
-			writePacket(w, gitprotocolio.ErrorPacket("internal error"))
+			writePacket(w, pkt.ErrorPacket("internal error"))
 			log.Printf("Parsing error: %#v, parser: %#v", err, v2Resp)
 		}
 	}
@@ -382,7 +384,7 @@ func httpURLForReceivePack(base string) (string, error) {
 	return u.String(), nil
 }
 
-func writePacket(w io.Writer, p gitprotocolio.Packet) error {
+func writePacket(w io.Writer, p pkt.Packet) error {
 	_, err := w.Write(p.EncodeToPktLine())
 	return err
 }
@@ -393,7 +395,7 @@ type synchronizedWriter struct {
 	closed bool
 }
 
-func (s *synchronizedWriter) writePacket(p gitprotocolio.Packet) error {
+func (s *synchronizedWriter) writePacket(p pkt.Packet) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if s.closed {
@@ -410,5 +412,5 @@ func (s *synchronizedWriter) closeWithError(err error) {
 		return
 	}
 	s.closed = true
-	s.w.Write(gitprotocolio.SideBandErrorPacket(err.Error()).EncodeToPktLine())
+	s.w.Write(pkt.SideBandErrorPacket(err.Error()).EncodeToPktLine())
 }

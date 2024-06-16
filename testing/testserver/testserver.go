@@ -1,3 +1,4 @@
+// Modified by Giacomo Tartari
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,14 +19,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 
-	"github.com/google/gitprotocolio/testing"
+	"github.com/cycloidio/pkt-line/testing"
 )
 
 var (
@@ -35,7 +35,7 @@ var (
 func main() {
 	flag.Parse()
 
-	gitDir, err := ioutil.TempDir("", "gitprotocolio_testserver")
+	gitDir, err := os.MkdirTemp("", "gitprotocolio_testserver")
 	if err != nil {
 		log.Fatal("cannot create remote dir", err)
 	}

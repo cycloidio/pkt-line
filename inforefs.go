@@ -1,3 +1,4 @@
+// Modified by Giacomo Tartari
 // Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gitprotocolio
+package pkt
 
 import (
 	"bytes"
@@ -25,13 +26,14 @@ import (
 type infoRefsResponseState int
 
 const (
-	infoRefsResponseStateScanServiceHeader infoRefsResponseState = iota
-	infoRefsResponseStateScanServiceHeaderFlush
-	infoRefsResponseStateScanOptionalProtocolVersion
-	infoRefsResponseStateScanCapabilities
-	infoRefsResponseStateScanRefs
-	infoRefsResponseStateScanProtocolV2Capabilities
-	infoRefsResponseStateEnd
+	infoRefsResponseScanBegin infoRefsResponseState = iota
+	infoRefsResponseScanServiceHeader
+	infoRefsResponseScanServiceHeaderFlush
+	infoRefsResponseScanOptionalProtocolVersion
+	infoRefsResponseScanCapabilities
+	infoRefsResponseScanRefs
+	infoRefsResponseScanProtocolV2Capabilities
+	infoRefsResponseEnd
 )
 
 // InfoRefsResponseChunk is a chunk of an /info/refs response.
@@ -103,7 +105,7 @@ func (r *InfoRefsResponse) Chunk() *InfoRefsResponseChunk {
 // returns false, the Err method will return any error that occurred during
 // scanning, except that if it was io.EOF, Err will return nil.
 func (r *InfoRefsResponse) Scan() bool {
-	if r.err != nil || r.state == infoRefsResponseStateEnd {
+	if r.err != nil || r.state == infoRefsResponseEnd {
 		return false
 	}
 	if !r.scanner.Scan() {
@@ -114,38 +116,54 @@ func (r *InfoRefsResponse) Scan() bool {
 
 transition:
 	switch r.state {
-	case infoRefsResponseStateScanServiceHeader:
+	case infoRefsResponseScanBegin:
 		bp, ok := pkt.(BytesPacket)
 		if !ok {
 			r.err = SyntaxError(fmt.Sprintf("unexpected packet: %#v", pkt))
 			return false
 		}
 		if bytes.HasPrefix(bp, []byte("version ")) {
-			r.state = infoRefsResponseStateScanOptionalProtocolVersion
+			r.state = infoRefsResponseScanOptionalProtocolVersion
+			goto transition
+		}
+		if bytes.HasPrefix(bp, []byte("# service=")) {
+			r.state = infoRefsResponseScanServiceHeader
+			goto transition
+		}
+		r.state = infoRefsResponseScanCapabilities
+		goto transition
+	case infoRefsResponseScanServiceHeader:
+		bp, ok := pkt.(BytesPacket)
+		if !ok {
+			r.err = SyntaxError(fmt.Sprintf("unexpected packet: %#v", pkt))
+			return false
+		}
+		if bytes.HasPrefix(bp, []byte("version ")) {
+			r.state = infoRefsResponseScanOptionalProtocolVersion
 			goto transition
 		}
 		if !bytes.HasPrefix(bp, []byte("# service=")) {
-			r.err = SyntaxError(fmt.Sprintf("expect the service header, but got: %v", pkt))
+			r.err = SyntaxError(fmt.Sprintf("expect the service header, but got: %s", pkt))
 		}
-		r.state = infoRefsResponseStateScanServiceHeaderFlush
+		r.state = infoRefsResponseScanServiceHeaderFlush
 		r.curr = &InfoRefsResponseChunk{
 			ServiceHeader: strings.TrimPrefix(strings.TrimSuffix(string(bp), "\n"), "# service="),
 		}
 		return true
-	case infoRefsResponseStateScanServiceHeaderFlush:
+	case infoRefsResponseScanServiceHeaderFlush:
 		if _, ok := pkt.(FlushPacket); !ok {
 			r.err = SyntaxError(fmt.Sprintf("unexpected packet: %#v", pkt))
 			return false
 		}
-		r.state = infoRefsResponseStateScanOptionalProtocolVersion
+		r.state = infoRefsResponseScanOptionalProtocolVersion
 		r.curr = &InfoRefsResponseChunk{
 			ServiceHeaderFlush: true,
 		}
 		return true
-	case infoRefsResponseStateScanOptionalProtocolVersion:
+	case infoRefsResponseScanOptionalProtocolVersion:
 		bp, ok := pkt.(BytesPacket)
 		if !ok || !bytes.HasPrefix(bp, []byte("version ")) {
-			r.state = infoRefsResponseStateScanCapabilities
+			r.state = infoRefsResponseScanCapabilities
 			goto transition
 		}
 		verStr := strings.TrimSuffix(strings.TrimPrefix(string(bp), "version "), "\n")
@@ -155,18 +173,18 @@ transition:
 			return false
 		}
 		if ver == 2 {
-			r.state = infoRefsResponseStateScanProtocolV2Capabilities
+			r.state = infoRefsResponseScanProtocolV2Capabilities
 		} else {
-			r.state = infoRefsResponseStateScanRefs
+			r.state = infoRefsResponseScanRefs
 		}
 		r.curr = &InfoRefsResponseChunk{
 			ProtocolVersion: ver,
 		}
 		return true
-	case infoRefsResponseStateScanCapabilities:
+	case infoRefsResponseScanCapabilities:
 		switch p := pkt.(type) {
 		case FlushPacket:
-			r.state = infoRefsResponseStateEnd
+			r.state = infoRefsResponseEnd
 			r.curr = &InfoRefsResponseChunk{
 				EndOfRequest: true,
 			}
@@ -187,7 +205,7 @@ transition:
 				r.err = SyntaxError("cannot split into two: " + string(zss[0]))
 				return false
 			}
-			r.state = infoRefsResponseStateScanRefs
+			r.state = infoRefsResponseScanRefs
 			r.curr = &InfoRefsResponseChunk{
 				Capabilities: caps,
 				ObjectID:     ss[0],
@@ -198,10 +216,10 @@ transition:
 			r.err = SyntaxError(fmt.Sprintf("unexpected packet: %#v", p))
 			return false
 		}
-	case infoRefsResponseStateScanRefs:
+	case infoRefsResponseScanRefs:
 		switch p := pkt.(type) {
 		case FlushPacket:
-			r.state = infoRefsResponseStateEnd
+			r.state = infoRefsResponseEnd
 			r.curr = &InfoRefsResponseChunk{
 				EndOfRequest: true,
 			}
@@ -221,10 +239,10 @@ transition:
 			r.err = SyntaxError(fmt.Sprintf("unexpected packet: %#v", p))
 			return false
 		}
-	case infoRefsResponseStateScanProtocolV2Capabilities:
+	case infoRefsResponseScanProtocolV2Capabilities:
 		switch p := pkt.(type) {
 		case FlushPacket:
-			r.state = infoRefsResponseStateEnd
+			r.state = infoRefsResponseEnd
 			r.curr = &InfoRefsResponseChunk{
 				EndOfRequest: true,
 			}

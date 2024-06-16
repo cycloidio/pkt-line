@@ -15,7 +15,6 @@
 package end2end
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,18 +28,18 @@ func TestPush(t *testing.T) {
 	if _, err := r.run("commit", "--allow-empty", "--message=init"); err != nil {
 		t.Fatal(err)
 	}
-	want, err := r.run("rev-parse", "master")
+	want, err := r.run("rev-parse", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for name, args := range protocolParams() {
 		refreshRemote()
-		if _, err := r.run(append(args, "push", httpProxyURL, "master:master")...); err != nil {
+		if _, err := r.run(append(args, "push", httpProxyURL, "main:main")...); err != nil {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
-		if got, err := remoteGitRepo.run("rev-parse", "master"); err != nil {
+		if got, err := remoteGitRepo.run("rev-parse", "main"); err != nil {
 			t.Errorf("%s: %v", name, err)
 		} else if got != want {
 			t.Errorf("%s: want %s, got %s", name, want, got)
@@ -61,7 +60,7 @@ func TestPush_multipleRefs(t *testing.T) {
 
 	for name, args := range protocolParams() {
 		refreshRemote()
-		if _, err := r.run(append(args, "push", httpProxyURL, "master:master", "another:another")...); err != nil {
+		if _, err := r.run(append(args, "push", httpProxyURL, "main:main", "another:another")...); err != nil {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
@@ -78,12 +77,12 @@ func TestPush_prereceiveReject(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(string(remoteGitRepo), "hooks"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(string(remoteGitRepo), "hooks", "pre-receive"), []byte("#!/bin/sh\nfalse\n"), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(string(remoteGitRepo), "hooks", "pre-receive"), []byte("#!/bin/sh\nfalse\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
 
 	for name, args := range protocolParams() {
-		if _, err := r.run(append(args, "push", httpProxyURL, "master:master")...); err == nil {
+		if _, err := r.run(append(args, "push", httpProxyURL, "main:main")...); err == nil {
 			t.Errorf("%s: want error, got nothing", name)
 			continue
 		} else if cmderr, ok := err.(*commandError); !ok {
@@ -103,7 +102,7 @@ func TestPush_nonFastForwardReject(t *testing.T) {
 		t.Fatal(err)
 	}
 	refreshRemote()
-	if _, err := r.run("push", httpServerURL, "master:master"); err != nil {
+	if _, err := r.run("push", httpServerURL, "main:main"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -117,7 +116,7 @@ func TestPush_nonFastForwardReject(t *testing.T) {
 	}
 
 	for name, args := range protocolParams() {
-		if _, err := r.run(append(args, "push", httpProxyURL, "master:master")...); err == nil {
+		if _, err := r.run(append(args, "push", httpProxyURL, "main:main")...); err == nil {
 			t.Errorf("%s: want error, got nothing", name)
 			continue
 		} else if cmderr, ok := err.(*commandError); !ok {
@@ -140,7 +139,7 @@ func TestPush_pushOption(t *testing.T) {
 
 	for name, args := range protocolParams() {
 		refreshRemote()
-		if _, err := r.run(append(args, "push", "-o", "testoption", httpProxyURL, "master:master")...); err != nil {
+		if _, err := r.run(append(args, "push", "-o", "testoption", httpProxyURL, "main:main")...); err != nil {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
@@ -157,7 +156,7 @@ func TestPush_multiplePushOptions(t *testing.T) {
 
 	for name, args := range protocolParams() {
 		refreshRemote()
-		if _, err := r.run(append(args, "push", "-o", "testoption1", "-o", "testoption2", httpProxyURL, "master:master")...); err != nil {
+		if _, err := r.run(append(args, "push", "-o", "testoption1", "-o", "testoption2", httpProxyURL, "main:main")...); err != nil {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
@@ -175,7 +174,7 @@ func TestPush_shallowPush(t *testing.T) {
 			t.Fatal(err)
 		}
 		refreshRemote()
-		if _, err := r.run("push", httpServerURL, "master:master"); err != nil {
+		if _, err := r.run("push", httpServerURL, "main:main"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -184,14 +183,14 @@ func TestPush_shallowPush(t *testing.T) {
 		if _, err := r.run("remote", "add", "origin", httpServerURL); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := r.run("pull", "--depth=1", "origin", "master"); err != nil {
+		if _, err := r.run("pull", "--depth=1", "origin", "main"); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := r.run("commit", "--allow-empty", "--message=third"); err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err := r.run(append(args, "push", httpProxyURL, "master:master")...); err != nil {
+		if _, err := r.run(append(args, "push", httpProxyURL, "main:main")...); err != nil {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
@@ -208,7 +207,7 @@ func TestPush_GPGSign(t *testing.T) {
 
 	for name, args := range protocolParams() {
 		refreshRemote()
-		if _, err := r.run(append(args, "push", "--signed", httpProxyURL, "master:master")...); err != nil {
+		if _, err := r.run(append(args, "push", "--signed", httpProxyURL, "main:main")...); err != nil {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}

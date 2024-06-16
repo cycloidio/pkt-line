@@ -15,7 +15,7 @@
 package testing
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/cgi"
 )
@@ -33,7 +33,7 @@ func HTTPHandler(gitBinary, gitDir string) http.Handler {
 			Args: []string{
 				"http-backend",
 			},
-			Stderr: ioutil.Discard,
+			Stderr: io.Discard,
 		}
 		if p := req.Header.Get("Git-Protocol"); p != "" {
 			h.Env = append(h.Env, "GIT_PROTOCOL="+p)
